@@ -6,6 +6,12 @@ if [[ "${1:-}" == "--force" ]]; then
   force=1
 fi
 
+cwd_base="$(basename "$PWD")"
+if [[ "$cwd_base" =~ ^day[0-9]+$ ]]; then
+  echo "refusing to run from $PWD; run from repo root instead." >&2
+  exit 1
+fi
+
 max_day=0
 for d in day*; do
   if [[ -d "$d" && "$d" =~ ^day([0-9]+)$ ]]; then
