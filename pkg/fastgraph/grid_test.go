@@ -1,4 +1,4 @@
-package graph
+package fastgraph
 
 import (
 	"testing"

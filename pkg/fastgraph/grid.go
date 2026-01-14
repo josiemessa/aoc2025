@@ -1,6 +1,6 @@
 // https://www.quasilyte.dev/blog/post/pathfinding/
 
-package graph
+package fastgraph
 
 import "math"
 
