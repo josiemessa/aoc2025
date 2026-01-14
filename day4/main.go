@@ -6,7 +6,7 @@ import (
 	"io"
 	"log"
 
-	"github.com/josiemessa/aoc2025/utils"
+	"github.com/josiemessa/aoc2025/pkg/utils"
 )
 
 func main() {
@@ -37,6 +37,27 @@ func main() {
 
 	fmt.Println("Part 1:", result1)
 	log.Println(resultString)
+}
+
+type cellType int
+
+const (
+	cellEmpty cellType = iota // 0
+	cellPaper                 // 1
+)
+
+func encode(c rune) uint8 {
+	if c == '@' {
+		return uint8(cellPaper)
+	}
+	return uint8(cellEmpty)
+}
+
+func decode(c uint8) rune {
+	if c == uint8(cellEmpty) {
+		return '.'
+	}
+	return '@'
 }
 
 func lookAround(lines []string, row int, col int) int {

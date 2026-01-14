@@ -7,7 +7,7 @@ import (
 	"log"
 	"math"
 
-	"github.com/josiemessa/aoc2025/utils"
+	"github.com/josiemessa/aoc2025/pkg/utils"
 )
 
 func main() {

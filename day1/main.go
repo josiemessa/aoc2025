@@ -8,7 +8,7 @@ import (
 	"log"
 	"strconv"
 
-	"github.com/josiemessa/aoc2025/utils"
+	"github.com/josiemessa/aoc2025/pkg/utils"
 )
 
 func main() {
