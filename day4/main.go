@@ -20,25 +20,60 @@ func main() {
 
 	// old()
 
-	var result1 int
-	graph := slowgraph.LinesToGridGraph(utils.ReadFileAsLines("input"), true)
-	graph.FloodFill(slowgraph.GridCoord{X: 0, Y: 0}, func(current slowgraph.GridCoord, neighbours []slowgraph.GridCoord) {
-		var paper int
-		d := graph.GetCoordData(current)
-		if d == '@' {
-			for _, c := range neighbours {
-				if graph.GetCoordData(c) == '@' {
-					paper++
+	graph := slowgraph.NewGraph(&slowgraph.Chess{}, utils.ReadFileAsLines("input"),
+		func(slowgraph.Coord, slowgraph.Coord) uint { return 1 })
+
+	// // Part 1
+	// var result1 int
+	// graph.FloodFill(slowgraph.Coord{X: 0, Y: 0}, func(current slowgraph.Coord, neighbours []slowgraph.Coord) {
+	// 	var paper int
+	// 	d := graph.GetCoordData(current)
+	// 	if d == '@' {
+	// 		for _, c := range neighbours {
+	// 			if graph.GetCoordData(c) == '@' {
+	// 				paper++
+	// 			}
+	// 		}
+	// 		if paper < 4 {
+	// 			result1++
+	// 			log.Println(current)
+	// 		}
+	// 	}
+	// })
+	// fmt.Println("Part 1:", result1)
+
+	// Part 2
+	// Note we need to start changing the graph inline
+	removed := true
+	var result2 int
+
+	for removed {
+		removed = false
+		newGraph := make([]rune, len(graph.Data))
+		copy(newGraph, graph.Data)
+		graph.FloodFill(slowgraph.Coord{X: 0, Y: 0}, func(current slowgraph.Coord, neighbours []slowgraph.Coord) {
+			var paper int
+			d := graph.GetCoordData(current)
+			if d == '@' {
+				// Count surrounding paper
+				for _, c := range neighbours {
+					if graph.GetCoordData(c) == '@' {
+						paper++
+					}
+				}
+				if paper < 4 {
+					// Paper is accessible, so remove it
+					removed = true
+					newGraph[current.Y*graph.NumCols+current.X] = '.'
+					result2++
 				}
 			}
-			if paper < 4 {
-				result1++
-				log.Println(current)
-			}
-		}
-	})
 
-	fmt.Println("Part 1:", result1)
+		})
+		graph.Data = newGraph
+	}
+
+	fmt.Println("Part 2:", result2)
 
 }
 

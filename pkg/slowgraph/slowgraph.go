@@ -8,69 +8,68 @@ import (
 	"github.com/josiemessa/aoc2025/pkg/queue"
 )
 
-type GridCoord struct {
+type Coord struct {
 	X uint
 	Y uint
 }
 
-type Heuristic interface {
-	Distance(GridCoord, GridCoord) uint
-	Neighbours(GridCoord) []GridCoord
+type GridMover interface {
+	Distance(Coord, Coord) uint
+	Neighbours(gc Coord, cols uint, rows uint) []Coord
 }
 
-type gridGraph struct {
+type GridGraph struct {
 	NumRows uint
 	NumCols uint
 
-	Data []rune
-	Cost func(GridCoord, GridCoord) uint
-	Heuristic
+	Data  []rune
+	Cost  func(Coord, Coord) uint
+	Mover GridMover
 }
 
-type ChessGridGraph struct {
-	*gridGraph
+type Chess struct {
+	GridGraph
 }
 
-type ManhattanGridGraph struct {
-	*gridGraph
+type Manhattan struct {
+	GridGraph
 }
 
-func LinesToGridGraph(lines []string, chess bool) gridGraph {
-	g := gridGraph{
+// NewGraph parses a slice of strings, assuming that each character represents a new tile on the grid
+// Graphmover specifies whether the movement on this grid is manhattan (no diagonals) or chess (diagonals)
+func NewGraph(g GridMover, lines []string, costFunc func(Coord, Coord) uint) GridGraph {
+	grid := GridGraph{
 		NumRows: uint(len(lines)),
 		NumCols: uint(len(lines[0])),
-	}
-	if chess {
-		g.Heuristic = &ChessGridGraph{gridGraph: &g}
-	} else {
-		g.Heuristic = &ManhattanGridGraph{gridGraph: &g}
+		Mover:   g,
+		Cost:    costFunc,
 	}
 
-	g.Data = make([]rune, g.NumRows*g.NumRows)
+	grid.Data = make([]rune, grid.NumRows*grid.NumRows)
 
 	var i int
 	for _, line := range lines {
 		for _, c := range line {
-			g.Data[i] = c
+			grid.Data[i] = c
 			i++
 		}
 	}
 
-	return g
+	return grid
 }
 
-func (g *gridGraph) GetCoordData(coord GridCoord) rune {
+func (g *GridGraph) GetCoordData(coord Coord) rune {
 	i := coord.Y*g.NumCols + coord.X
 	return g.Data[i]
 }
 
 // Chessboard/Chebyshev neighbours
-func (g *ChessGridGraph) Neighbours(start GridCoord) []GridCoord {
-	var result []GridCoord
+func (g *Chess) Neighbours(start Coord, numCols, numRows uint) []Coord {
+	var result []Coord
 	for i := -1; i <= 1; i++ {
 		// out of bounds check
 		checkRow := int(start.Y) + i
-		if checkRow < 0 || checkRow >= int(g.NumRows) {
+		if checkRow < 0 || checkRow >= int(numRows) {
 			continue
 		}
 
@@ -82,59 +81,59 @@ func (g *ChessGridGraph) Neighbours(start GridCoord) []GridCoord {
 
 			// out of bounds check
 			checkCol := int(start.X) + j
-			if checkCol < 0 || checkCol >= int(g.NumCols) {
+			if checkCol < 0 || checkCol >= int(numCols) {
 				continue
 			}
 
-			result = append(result, GridCoord{X: uint(checkCol), Y: uint(checkRow)})
+			result = append(result, Coord{X: uint(checkCol), Y: uint(checkRow)})
 		}
 	}
 	return result
 }
 
 // Axial/Manhattan neighbours
-func (g *ManhattanGridGraph) Neighbours(start GridCoord) []GridCoord {
-	var result []GridCoord
+func (g *Manhattan) Neighbours(start Coord, numCols, numRows uint) []Coord {
+	var result []Coord
 	candidates := [4][2]int{
 		{0, 1}, {1, 0}, {0, -1}, {-1, 0},
 	}
 	for _, c := range candidates {
 		// out of bounds check
 		checkRow := int(start.Y) + c[1]
-		if checkRow < 0 || checkRow >= int(g.NumRows) {
+		if checkRow < 0 || checkRow >= int(numRows) {
 			continue
 		}
 		// out of bounds check
 		checkCol := int(start.X) + c[0]
-		if checkCol < 0 || checkCol >= int(g.NumCols) {
+		if checkCol < 0 || checkCol >= int(numCols) {
 			continue
 		}
 
-		result = append(result, GridCoord{X: uint(checkCol), Y: uint(checkRow)})
+		result = append(result, Coord{X: uint(checkCol), Y: uint(checkRow)})
 	}
 	return result
 }
 
-func (g *ManhattanGridGraph) Distance(a GridCoord, b GridCoord) uint {
+func (g *Manhattan) Distance(a Coord, b Coord) uint {
 	return uint(math.Abs(float64(a.X)-float64(b.X)) + math.Abs(float64(a.Y)-float64(b.Y)))
 }
 
 // ChebyshevDistance is the distance between coords on a grid where diagonal moves are allowed
 // aka chessboard distance
-func (g *ChessGridGraph) Distance(a GridCoord, b GridCoord) uint {
+func (g *Chess) Distance(a Coord, b Coord) uint {
 	return uint(math.Max((math.Abs(float64(a.X) - float64(a.Y))), math.Abs(float64(a.Y)-float64(b.Y))))
 }
 
 // FloodFill finds every tile in the graph and executes f() on that
-func (g *gridGraph) FloodFill(start GridCoord, f func(current GridCoord, neighbours []GridCoord)) {
+func (g *GridGraph) FloodFill(start Coord, f func(current Coord, neighbours []Coord)) {
 	frontier := make(queue.Queue, 0)
 	frontier.Enqueue(&queue.Item{Value: start})
-	reached := map[GridCoord]struct{}{start: {}}
+	reached := map[Coord]struct{}{start: {}}
 
 	for len(frontier) != 0 {
-		current := frontier.Dequeue().Value.(GridCoord)
+		current := frontier.Dequeue().Value.(Coord)
 		// TODO: this assumes chess neighbours
-		neighbours := g.Neighbours(current)
+		neighbours := g.Mover.Neighbours(current, g.NumCols, g.NumRows)
 		for _, next := range neighbours {
 			if _, ok := reached[next]; !ok {
 				frontier.Enqueue(&queue.Item{Value: next})
@@ -147,19 +146,19 @@ func (g *gridGraph) FloodFill(start GridCoord, f func(current GridCoord, neighbo
 
 // BreadthFirstSearch generates a map of which tile we came from to reach the current tile, starting at start.
 // Goal provides an early exit criteria
-func (g *gridGraph) BreadthFirstSearch(start GridCoord, goal GridCoord) map[GridCoord]GridCoord {
+func (g *GridGraph) BreadthFirstSearch(start Coord, goal Coord) map[Coord]Coord {
 	frontier := make(queue.Queue, 0)
 	frontier.Enqueue(&queue.Item{Value: start})
-	cameFrom := map[GridCoord]GridCoord{start: {}}
+	cameFrom := map[Coord]Coord{start: {}}
 
 	for len(frontier) != 0 {
-		current := frontier.Dequeue().Value.(GridCoord)
+		current := frontier.Dequeue().Value.(Coord)
 
 		if current == goal {
 			break
 		}
 		// TODO: this assumes chess neighbours
-		for _, next := range g.Neighbours(current) {
+		for _, next := range g.Mover.Neighbours(current, g.NumCols, g.NumRows) {
 			if _, ok := cameFrom[next]; !ok {
 				frontier.Enqueue(&queue.Item{Value: next})
 				cameFrom[next] = current
@@ -173,21 +172,21 @@ func (g *gridGraph) BreadthFirstSearch(start GridCoord, goal GridCoord) map[Grid
 // starting from start (used for Dijkstra)
 // Graph must have a `Cost()` function defined on it so it can calculate the cost of travelling
 // from one tile to another
-func (g *gridGraph) DijkstraSearch(start GridCoord, goal GridCoord) map[GridCoord]GridCoord {
+func (g *GridGraph) DijkstraSearch(start Coord, goal Coord) map[Coord]Coord {
 	frontier := make(queue.PriorityQueue, g.NumCols*g.NumRows)
 	heap.Push(&frontier, queue.NewPriorityItem(start, 0))
-	cameFrom := map[GridCoord]GridCoord{start: {}}
-	costSoFar := map[GridCoord]uint{start: 0}
+	cameFrom := map[Coord]Coord{start: {}}
+	costSoFar := map[Coord]uint{start: 0}
 
 	for len(frontier) != 0 {
-		current := heap.Pop(&frontier).(*queue.PriorityItem).GetValue().(GridCoord)
+		current := heap.Pop(&frontier).(*queue.PriorityItem).GetValue().(Coord)
 
 		if current == goal {
 			break
 		}
 
 		// TODO: this assumes chess neighbours
-		for _, next := range g.Neighbours(current) {
+		for _, next := range g.Mover.Neighbours(current, g.NumCols, g.NumRows) {
 			newCost := costSoFar[current] + g.Cost(current, next)
 			if _, ok := costSoFar[next]; !ok || newCost < costSoFar[next] {
 				costSoFar[next] = newCost
@@ -200,21 +199,21 @@ func (g *gridGraph) DijkstraSearch(start GridCoord, goal GridCoord) map[GridCoor
 }
 
 // GreedyBestFirstSearch implements the GreedyBFS algorithm
-func (g *gridGraph) GreedyBestFirstSearch(start GridCoord, goal GridCoord, h Heuristic) map[GridCoord]GridCoord {
+func (g *GridGraph) GreedyBestFirstSearch(start Coord, goal Coord) map[Coord]Coord {
 	frontier := make(queue.PriorityQueue, g.NumCols*g.NumRows)
 	heap.Push(&frontier, queue.NewPriorityItem(start, 0))
-	cameFrom := map[GridCoord]GridCoord{start: {}}
+	cameFrom := map[Coord]Coord{start: {}}
 	for len(frontier) != 0 {
-		current := heap.Pop(&frontier).(*queue.PriorityItem).GetValue().(GridCoord)
+		current := heap.Pop(&frontier).(*queue.PriorityItem).GetValue().(Coord)
 
 		if current == goal {
 			break
 		}
 
 		// TODO: this assumes chess neighbours
-		for _, next := range g.Neighbours(current) {
+		for _, next := range g.Mover.Neighbours(current, g.NumCols, g.NumRows) {
 			if _, ok := cameFrom[next]; !ok {
-				heap.Push(&frontier, queue.NewPriorityItem(next, int(g.Distance(goal, next))))
+				heap.Push(&frontier, queue.NewPriorityItem(next, int(g.Mover.Distance(goal, next))))
 				cameFrom[next] = current
 			}
 		}
@@ -224,25 +223,25 @@ func (g *gridGraph) GreedyBestFirstSearch(start GridCoord, goal GridCoord, h Heu
 
 // AStar implements the A* algorithm
 // Graph must have a Cost() defined to
-func (g *gridGraph) AStarSearch(start GridCoord, goal GridCoord) map[GridCoord]GridCoord {
+func (g *GridGraph) AStarSearch(start Coord, goal Coord) map[Coord]Coord {
 	frontier := make(queue.PriorityQueue, g.NumCols*g.NumRows)
 	heap.Push(&frontier, queue.NewPriorityItem(start, 0))
-	cameFrom := map[GridCoord]GridCoord{start: {}}
-	costSoFar := map[GridCoord]uint{start: 0}
+	cameFrom := map[Coord]Coord{start: {}}
+	costSoFar := map[Coord]uint{start: 0}
 
 	for len(frontier) != 0 {
-		current := heap.Pop(&frontier).(*queue.PriorityItem).GetValue().(GridCoord)
+		current := heap.Pop(&frontier).(*queue.PriorityItem).GetValue().(Coord)
 
 		if current == goal {
 			break
 		}
 
 		// TODO: this assumes chess neighbours
-		for _, next := range g.Neighbours(current) {
+		for _, next := range g.Mover.Neighbours(current, g.NumCols, g.NumRows) {
 			newCost := costSoFar[current] + g.Cost(current, next)
 			if _, ok := costSoFar[next]; !ok || newCost < costSoFar[next] {
 				costSoFar[next] = newCost
-				heap.Push(&frontier, queue.NewPriorityItem(next, int(newCost+g.Distance(goal, next))))
+				heap.Push(&frontier, queue.NewPriorityItem(next, int(newCost+g.Mover.Distance(goal, next))))
 				cameFrom[next] = current
 			}
 		}
@@ -250,8 +249,8 @@ func (g *gridGraph) AStarSearch(start GridCoord, goal GridCoord) map[GridCoord]G
 	return cameFrom
 }
 
-func (g *gridGraph) FindPath(start GridCoord, goal GridCoord, search map[GridCoord]GridCoord) []GridCoord {
-	path := make([]GridCoord, 0)
+func (g *GridGraph) FindPath(start Coord, goal Coord, search map[Coord]Coord) []Coord {
+	path := make([]Coord, 0)
 	current := goal
 	for current != start {
 		path = append(path, current)
