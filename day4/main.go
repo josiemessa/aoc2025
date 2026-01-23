@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"time"
 
 	"github.com/josiemessa/aoc2025/pkg/slowgraph"
 	"github.com/josiemessa/aoc2025/pkg/utils"
@@ -20,30 +21,33 @@ func main() {
 
 	// old()
 
+	// Part 1
+	start := time.Now()
+	var result1 int
 	graph := slowgraph.NewGraph(&slowgraph.Chess{}, utils.ReadFileAsLines("input"),
 		func(slowgraph.Coord, slowgraph.Coord) uint { return 1 })
-
-	// // Part 1
-	// var result1 int
-	// graph.FloodFill(slowgraph.Coord{X: 0, Y: 0}, func(current slowgraph.Coord, neighbours []slowgraph.Coord) {
-	// 	var paper int
-	// 	d := graph.GetCoordData(current)
-	// 	if d == '@' {
-	// 		for _, c := range neighbours {
-	// 			if graph.GetCoordData(c) == '@' {
-	// 				paper++
-	// 			}
-	// 		}
-	// 		if paper < 4 {
-	// 			result1++
-	// 			log.Println(current)
-	// 		}
-	// 	}
-	// })
-	// fmt.Println("Part 1:", result1)
+	graph.FloodFill(slowgraph.Coord{X: 0, Y: 0}, func(current slowgraph.Coord, neighbours []slowgraph.Coord) {
+		var paper int
+		d := graph.GetCoordData(current)
+		if d == '@' {
+			for _, c := range neighbours {
+				if graph.GetCoordData(c) == '@' {
+					paper++
+				}
+			}
+			if paper < 4 {
+				result1++
+				log.Println(current)
+			}
+		}
+	})
+	fmt.Printf("Part 1: %d (%s)\n", result1, time.Since(start).String())
 
 	// Part 2
 	// Note we need to start changing the graph inline
+	start = time.Now()
+	graph = slowgraph.NewGraph(&slowgraph.Chess{}, utils.ReadFileAsLines("input"),
+		func(slowgraph.Coord, slowgraph.Coord) uint { return 1 })
 	removed := true
 	var result2 int
 
@@ -73,8 +77,7 @@ func main() {
 		graph.Data = newGraph
 	}
 
-	fmt.Println("Part 2:", result2)
-
+	fmt.Printf("Part 2: %d (%s)\n", result2, time.Since(start).String())
 }
 
 func old() {
