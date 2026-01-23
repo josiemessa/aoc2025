@@ -23,6 +23,9 @@ func (r *rangeList) Len() int {
 }
 
 func (r *rangeList) Less(i, j int) bool {
+	if r.starts[i] == r.starts[j] {
+		return r.ends[i] < r.ends[j]
+	}
 	return r.starts[i] < r.starts[j]
 }
 
@@ -36,6 +39,25 @@ func (r *rangeList) Swap(i, j int) {
 	r.ends[j] = oldEnds
 }
 
+func (r *rangeList) In(ingredient uint64, j int) (int, bool) {
+	if j >= r.Len() {
+		return -1, false
+	}
+	if ingredient == r.starts[j] {
+		return j, true
+	}
+	if ingredient == r.ends[j] {
+		return j, true
+	}
+	if ingredient > r.starts[j] {
+		if ingredient < r.ends[j] {
+			// inside this range, we found it!
+			return j, true
+		}
+	}
+	return -1, false
+}
+
 func main() {
 	log.SetFlags(0)
 	debug := flag.Bool("debug", false, "enable debug logging")
@@ -46,7 +68,7 @@ func main() {
 
 	startTime := time.Now()
 
-	lines := utils.ReadFileAsLines("input")
+	lines := utils.ReadFileAsLines("test-input")
 	var index int
 
 	for i, v := range lines {
@@ -84,29 +106,47 @@ func main() {
 		if err != nil {
 			log.Fatalf("could not parse line %d %q: %s\n", i, lines[i], err)
 		}
-		idx, found := sort.Find(fresh.Len(), func(j int) int {
-			if ingredient == fresh.starts[j] {
-				return 0
+		var found bool
+		var idx int
+		for j := 0; j < fresh.Len(); j++ {
+			idx, found = fresh.In(ingredient, j)
+			if found {
+				break
 			}
-			if ingredient == fresh.ends[j] {
-				return 0
-			}
-			if ingredient > fresh.starts[j] {
-				if ingredient < fresh.ends[j] {
-					// inside this range, we found it!
-					return 0
-				}
-				// must be greater than this range
-				return 1
-			}
-			return -1
-		})
+		}
 
 		if found {
 			result1++
 			log.Printf("Found %d in range %d-%d\n", ingredient, fresh.starts[idx], fresh.ends[idx])
+			continue
 		}
 	}
 
 	fmt.Printf("Part 1: %d (%s)\n", result1, time.Since(startTime).String())
+
+	// Part 2
+	startTime = time.Now()
+	var result2 uint64
+
+	for i := 0; i < fresh.Len(); i++ {
+		start := fresh.starts[i]
+		end := fresh.ends[i]
+		// check if this range overlaps with any of the next ranges
+		for j := 1; j < fresh.Len()-i; j++ {
+			if _, ok := fresh.In(fresh.starts[i+j], i); ok {
+				if fresh.ends[i+j] > end {
+					end = fresh.ends[i+j]
+				}
+			} else {
+				// if we can't find the next starting range in the current range, we can stop looking as they are ordered
+				i += j - 1
+				break
+			}
+		}
+
+		result2 += end - start + 1
+	}
+
+	fmt.Printf("Part 2: %d (%s)\n", result2, time.Since(startTime).String())
+
 }
