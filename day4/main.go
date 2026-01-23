@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 
+	"github.com/josiemessa/aoc2025/pkg/slowgraph"
 	"github.com/josiemessa/aoc2025/pkg/utils"
 )
 
@@ -17,6 +18,31 @@ func main() {
 		log.SetOutput(io.Discard)
 	}
 
+	// old()
+
+	var result1 int
+	graph := slowgraph.LinesToGridGraph(utils.ReadFileAsLines("input"), true)
+	graph.FloodFill(slowgraph.GridCoord{X: 0, Y: 0}, func(current slowgraph.GridCoord, neighbours []slowgraph.GridCoord) {
+		var paper int
+		d := graph.GetCoordData(current)
+		if d == '@' {
+			for _, c := range neighbours {
+				if graph.GetCoordData(c) == '@' {
+					paper++
+				}
+			}
+			if paper < 4 {
+				result1++
+				log.Println(current)
+			}
+		}
+	})
+
+	fmt.Println("Part 1:", result1)
+
+}
+
+func old() {
 	var result1 int
 	var resultString string
 
@@ -37,27 +63,6 @@ func main() {
 
 	fmt.Println("Part 1:", result1)
 	log.Println(resultString)
-}
-
-type cellType int
-
-const (
-	cellEmpty cellType = iota // 0
-	cellPaper                 // 1
-)
-
-func encode(c rune) uint8 {
-	if c == '@' {
-		return uint8(cellPaper)
-	}
-	return uint8(cellEmpty)
-}
-
-func decode(c uint8) rune {
-	if c == uint8(cellEmpty) {
-		return '.'
-	}
-	return '@'
 }
 
 func lookAround(lines []string, row int, col int) int {
